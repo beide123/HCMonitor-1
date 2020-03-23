@@ -1,8 +1,9 @@
 HCMonitor/build/
-HCMonitor/cdf.txt
-HCMonitor/err
-HCMonitor/tags
-HCMonior/burst.txt
-HCMonitor/response.txt
-HCMoniotr/out
+HCMonitor/cdf*
+HCMonitor/time*
+HCMonitor/tag*
+HCMonitor/burst*
+HCMonitor/response*
+HCMonitor/err*
+HCMonitor/out*
 
