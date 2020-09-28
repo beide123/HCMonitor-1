@@ -38,6 +38,7 @@
 
 #include "http_parse.h"
 
+#if USE_HTTP
 uint8_t http_parse(struct rte_ipv4_hdr *ip_hdr,struct node_data *data,struct timespec ts_now)
 {
     struct rte_tcp_hdr  *tcp;
@@ -145,6 +146,6 @@ uint8_t http_parse(struct rte_ipv4_hdr *ip_hdr,struct node_data *data,struct tim
 	}
 	
 }
-
+#endif
 
 
