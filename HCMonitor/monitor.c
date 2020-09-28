@@ -61,6 +61,16 @@ struct rte_hash_parameters ipv4_req_hash_params = {
        .hash_func_init_val = 0,
 };
 
+/* Params for initial hash table*/
+struct rte_hash_parameters burst_hash_params = {
+       .name = NULL,
+       .entries = BURST_HASH_ENTRIES,
+       //.bucket_entries = REQ_HASH_BUCKET,
+       //.key_len = sizeof(struct http_tuple),
+       .hash_func = DEFAULT_HASH_FUNC,
+       .hash_func_init_val = 0,
+};
+
 struct req_vars{
 	int count;
 	int idx;
@@ -77,6 +87,7 @@ struct req_temp{
 typedef struct rte_hash req_lookup_struct_t;
 
 static req_lookup_struct_t *req_lookup_struct[2];
+static req_lookup_struct_t *burst_lookup_struct[2];
 static struct timespec req_out_if[REQ_HASH_ENTRIES];
 static struct req_temp Maxseq[REQ_HASH_ENTRIES] = {0};
 
@@ -556,6 +567,7 @@ int res_setup_hash(uint16_t socket_id)
     }else{
         ipv4_req_hash_params.key_len = sizeof(struct ipv4_2tuple);
     }
+    burst_hash_params.key_len = sizeof(struct burst_tuple);
     snprintf(s, sizeof(s), "ipv4_hash_%d", socket_id);
     ipv4_req_hash_params.name = s;
     ipv4_req_hash_params.socket_id = socket_id;
@@ -564,18 +576,59 @@ int res_setup_hash(uint16_t socket_id)
         rte_exit(EXIT_FAILURE, "Unable to create the request hash on "
                             "socket %d\n", socket_id);
     else
-     printf("Success creat request hash on socket %d\n",socket_id);
+     	printf("Success creat request hash on socket %d\n",socket_id);
+    
+    snprintf(s, sizeof(s), "burst_hash_%d", socket_id);
+    burst_hash_params.name = s;
+    burst_hash_params.socket_id = socket_id;
+    burst_lookup_struct[socket_id] = rte_hash_create(&burst_hash_params);
+    if (burst_lookup_struct[socket_id] == NULL)
+        rte_exit(EXIT_FAILURE, "Unable to create the burst hash on "
+                            "socket %d\n", socket_id);
+    else
+        printf("Success creat request hash on socket %d\n",socket_id);
 	/*creat delay time store buffer*/
-	thre = CAT_BUFF;
-	ack_time = (struct atime*)calloc(1, sizeof(struct atime));
-	ack_time->time = (float*)calloc(CAT_BUFF, sizeof(float));
-	ack_time->pri = (int*)calloc(CAT_BUFF, sizeof(int));
-	ack_time_hy = (struct atime*)calloc(1, sizeof(struct atime));
-	ack_time_hy->time = (float*)calloc(CAT_BUFF, sizeof(float));
-	ack_time_hy->pri = (int*)calloc(CAT_BUFF, sizeof(int));
-	ack_pri_high = (float*)calloc(PH_BUFF, sizeof(float));
-	ack_pri_low = (float*)calloc(PL_BUFF, sizeof(float));
-	return 1;
+    thre = CAT_BUFF;
+    ack_time = (struct atime*)calloc(1, sizeof(struct atime));
+    ack_time->time = (float*)calloc(CAT_BUFF, sizeof(float));
+    ack_time->pri = (int*)calloc(CAT_BUFF, sizeof(int));
+    ack_time_hy = (struct atime*)calloc(1, sizeof(struct atime));
+    ack_time_hy->time = (float*)calloc(CAT_BUFF, sizeof(float));
+    ack_time_hy->pri = (int*)calloc(CAT_BUFF, sizeof(int));
+    ack_pri_high = (float*)calloc(PH_BUFF, sizeof(float));
+    ack_pri_low = (float*)calloc(PL_BUFF, sizeof(float));
+    return 1;
+}
+
+
+int burst_count(struct rte_ipv4_hdr *ip_hdr,struct node_data *data,struct timespec ts_now)
+{
+    struct rte_tcp_hdr  *tcp;
+
+    int id;
+
+    int poffset = conf->label_offset;
+
+    tcp = (struct rte_tcp_hdr *)((unsigned char *) ip_hdr + sizeof(struct rte_ipv4_hdr));
+    unsigned char *req_bit = (unsigned char *) tcp + (tcp->data_off >> 2);
+
+    if(!data){
+        printf("node_data has been NULL!");
+        return 0;
+    }
+
+    if (likely(req_bit[poffset] == conf->req_label[0] || req_bit[poffset] == conf->req_label[1])) 
+    { 
+
+        data->key.ip_src = rte_be_to_cpu_32(ip_hdr->src_addr);
+ 
+        id = rte_hash_add_key(burst_lookup_struct[0],(void *) &(data->key));
+
+        id = id % IP_NUM;
+
+        burst[id]++;	
+    }
+    return 1;
 }
 
 
@@ -593,7 +646,7 @@ int key_extract(struct rte_ipv4_hdr *ip_hdr,struct node_data *data,struct timesp
 
     if (likely(req_bit[poffset] == conf->req_label[0] || req_bit[poffset] == conf->req_label[1])) 
     { 
- 	    burst++;
+ 	    request_num++;
 
         data->key.ip_src = rte_be_to_cpu_32(ip_hdr->src_addr);
                 
@@ -645,40 +698,46 @@ int key_extract(struct rte_ipv4_hdr *ip_hdr,struct node_data *data,struct timesp
 int packet_process(struct rte_ipv4_hdr *ip_hdr, struct timespec ts_now, int lcore_id)
 {	
     int la_key;
-	if(likely((PrQue[lcore_id]->occupy + 1) % max_size != PrQue[lcore_id]->deque)){
-        QType *q = PrQue[lcore_id]->RxQue + PrQue[lcore_id]->occupy;
-        if(conf->enable_http)
-           la_key = http_parse(ip_hdr, q, ts_now);
-        else
-    	    la_key = key_extract(ip_hdr, q, ts_now); 
-	    if(likely(la_key > 0))
-    	{       
-		    PrQue[lcore_id]->occupy = (PrQue[lcore_id]->occupy + 1) % max_size;
-		    _mm_sfence();
-        	return 1;			
-    	}else{
-    	    //printf("Enqueue failed\n");
-            return la_key;		
-	    }		
+    if(likely((PrQue[lcore_id]->occupy + 1) % max_size != PrQue[lcore_id]->deque)){
+    QType *q = PrQue[lcore_id]->RxQue + PrQue[lcore_id]->occupy;
+#if USE_HTTP
+       la_key = http_parse(ip_hdr, q, ts_now);
+#endif
+    if(conf->enable_mcc)
+       la_key = burst_count(ip_hdr, q, ts_now);
+    else
+       la_key = key_extract(ip_hdr, q, ts_now); 
+       if(likely(la_key > 0))
+	{       
+    	    PrQue[lcore_id]->occupy = (PrQue[lcore_id]->occupy + 1) % max_size;
+    	    _mm_sfence();
+    	return 1;			
 	}else{
-		PrQue[lcore_id]->RxQue = (QType*)realloc(PrQue[lcore_id]->RxQue,
-                                    (2 * max_size) * sizeof(struct node_data));
-		max_size = 2 * max_size;
-        QType *q = PrQue[lcore_id]->RxQue + PrQue[lcore_id]->occupy;
-        if(conf->enable_http)
-            la_key = http_parse(ip_hdr, q, ts_now);
-        else
-		    la_key = key_extract(ip_hdr, q ,ts_now); 
-		if(likely(la_key) > 0)
-    	{       
-			PrQue[lcore_id]->occupy = (PrQue[lcore_id]->occupy + 1) % max_size;
-			_mm_sfence();
-        	return 1;		
-    	}else{		
-			//printf("Enqueue failed\n");
-            return la_key;
-		}	
-	}
-    		
+	    //printf("Enqueue failed\n");
+        return la_key;		
+        }		
+    }else{
+    	PrQue[lcore_id]->RxQue = (QType*)realloc(PrQue[lcore_id]->RxQue,
+                                (2 * max_size) * sizeof(struct node_data));
+    max_size = 2 * max_size;
+    QType *q = PrQue[lcore_id]->RxQue + PrQue[lcore_id]->occupy;
+#if USE_HTTP
+        la_key = http_parse(ip_hdr, q, ts_now);
+#endif
+    if(conf->enable_mcc)
+        la_key = burst_count(ip_hdr, q, ts_now);
+    else
+    	la_key = key_extract(ip_hdr, q ,ts_now); 
+    	if(likely(la_key) > 0)
+	{       
+    		PrQue[lcore_id]->occupy = (PrQue[lcore_id]->occupy + 1) % max_size;
+    		_mm_sfence();
+    	return 1;		
+	}else{		
+    		//printf("Enqueue failed\n");
+        return la_key;
+    	}	
+    }
+		
 }
 

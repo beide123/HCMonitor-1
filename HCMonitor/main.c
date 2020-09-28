@@ -527,8 +527,9 @@ l2fwd_main_loop(void)
 			
 
 	if(lcore_id == TIMER_LCORE){
-		RTE_LOG(INFO, L2FWD, "entering timer loop on lcore %u\n", lcore_id);
+	    RTE_LOG(INFO, L2FWD, "entering timer loop on lcore %u\n", lcore_id);
         FILE *fp_r = fopen(rlog,"a");
+        int i;
 		while(1){
 		
 			cur_tsc = rte_rdtsc();
@@ -550,15 +551,13 @@ l2fwd_main_loop(void)
 							/* reset the timer */
 							timer_tsc = 0;
 							//uint64_t start_t = rte_rdtsc();
-							if(burst){
-	    						FILE *fp = fopen(blog, "a");			
-								fprintf(fp,"%d\n",burst);//,start_t);
-								fclose(fp);
-							}
-							//fprintf(fp_r,"%d\n",response_num);//,start_t);
-							burst = 0;
-							//response_num = 0;
-						
+	    					FILE *fp = fopen(blog, "a");			
+							for(i = 0; i < 25; i = i + 5){
+								fprintf(fp,"%d,",burst[i]);//,start_t);
+                                burst[i] = 0;
+                            }
+							fprintf(fp,"\n");//,start_t);
+							fclose(fp);
 					}
 				}
 			
@@ -604,7 +603,6 @@ l2fwd_main_loop(void)
 				rte_prefetch0(rte_pktmbuf_mtod(m, void *));
 				ts_now.tv_sec = ts.tv_sec;
 				ts_now.tv_nsec = ts.tv_nsec;
-				burst++;
 				l2fwd_simple_forward(m, portid, ts_now, lcore_id);
 			}
 		}
@@ -845,7 +843,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	nb_ports = rte_eth_dev_count();
+	nb_ports = rte_eth_dev_count_avail();
 	nr_ports = nb_ports;
 	
 	if (nb_ports == 0)
