@@ -115,7 +115,7 @@ char arlog[20] = "latency_area.txt";
 char artlog[20] = "det_latency.txt";
 #endif
 
-#ifdef PMD_MODE
+#ifdef PRI_DEBUG
 char retra[20] = "retrans.txt";
 #endif
 
@@ -206,9 +206,8 @@ int compInc(const void *a, const void *b)
 
 void clear(void)
 {
-    idx_pri_low = 0;
-    idx_pri_high = 0;
     memset(req_hy_count, 0, sizeof(struct req_vars) * REQ_HASH_ENTRIES);
+    memset(Maxseq, 0, sizeof(struct req_temp) * REQ_HASH_ENTRIES);
 }
 
 float avg(float a[],unsigned int n)
@@ -293,8 +292,11 @@ void cdf_acktime(struct atime *ack_time_pro,unsigned int idx)
 	fprintf(fp, "connections:%d,retrans:%d,avg_delay:%f\n",
 			conn_active_mid,recount,avg_delay);
 	fprintf(fp, "recv_pri_high:%d, recv_pri_low:%d.\n"
+                "resp_pri_high:%d, resp_pri_low:%d.\n"
                 "pri_high_num:%d,low_pri_num:%d\n",
-            idx_pri_high, idx_pri_low, num_high,num_low);
+                recv_pri_high, recv_pri_low,
+ 				idx_pri_high, idx_pri_low, 
+                num_high,num_low);
 	fprintf(fp, "CDF: %9s: %18s: %26s:\n","total","high_pri","low_pri");
 	
 	recount = 0;
@@ -417,6 +419,10 @@ void lcore_online(void)
 			idx = idx_hy;
 			idx_hy = 0;
 			cdf_acktime(ack_time_hy,idx);
+    		idx_pri_low = 0;
+    		idx_pri_high = 0;
+    		recv_pri_low = 0;
+    		recv_pri_high = 0;
 		}else{
 			lock_flag = 1;			
 		}
@@ -448,11 +454,11 @@ int response_time_process(struct node_data *data,uint16_t nb_rx,uint16_t socket_
 		
         //traffic += data->total_len + 14; 
         if(data->pri == conf->pri_high_label){
-		    //idx_pri_high++;				                 
+		    recv_pri_high++;				                 
 		    req_hy_count[ret_req].pri = 1;
         }else{
-        	//idx_pri_low++;
-		    req_hy_count[ret_req].pri = 2;
+            recv_pri_low++;
+		    req_hy_count[ret_req].pri = data->pri;
 	    }
 
     	if(Maxseq[ret_req].sent_seq < data->sent_seq)
@@ -480,20 +486,34 @@ int response_time_process(struct node_data *data,uint16_t nb_rx,uint16_t socket_
         ret = rte_hash_lookup(req_lookup_struct[socket_id],(const void *)&(data->key));
 
 
-	    if ((data->sent_seq - Maxseq[ret].sent_seq > data->total_len - 40) || ret < 0) {
-#ifdef PMD_MOD
+	    if ((data->sent_seq - Maxseq[ret].sent_seq > data->total_len - 40)) {
+#ifdef PRI_DEBUG
 			FILE *fp_re = fopen(retra,"a");
 			fprintf(fp_re,"response_pkt:ip_dst:%lu,port_dst:%lu,ack:%lu,sent_seq:%lu\n"
 						  "request_pkt:ip_src:%lu,port_src:%lu,sent_seq:%lu,ack:%lu\n"
+                          "seq_diff:%d\n"
+                          "total_len:%d\n"
 						  "====================\n",
-							(data->key.ip_src & 0xff),data->key.port_src,data->sent_seq,
-							data->ack_seq,(Maxseq[ret].ip_src & 0xff),Maxseq[ret].port_src,
-							Maxseq[ret].sent_seq,Maxseq[ret].ack_seq);
-			fclose(fp_re);
+							(data->key.ip_src & 0xff),
+							data->key.port_src,
+							data->sent_seq,
+							data->ack_seq,
+							(Maxseq[ret].ip_src & 0xff),
+							Maxseq[ret].port_src,
+							Maxseq[ret].sent_seq,
+							Maxseq[ret].ack_seq,
+                            data->sent_seq - Maxseq[ret].sent_seq,
+							data->total_len);
+							fclose(fp_re);
 #endif
 			recount++;
-            return -2;
+			
+			return -2;
         } 
+
+		if (ret < 0){
+			return -2;
+		}
 
  	    t_req.tv_sec = req_out_if[ret].tv_sec;//-2 presents not find req
         t_req.tv_nsec = req_out_if[ret].tv_nsec;
@@ -522,27 +542,29 @@ int response_time_process(struct node_data *data,uint16_t nb_rx,uint16_t socket_
 				req_hy_count[ret].idx,req_stamp,resp_stamp,ack);			
 			    fclose(fp_art);
 #endif
-			    if(req_hy_count[ret].pri == 1){
+			    if(req_hy_count[ret].pri){
 				    idx_pri_high++;				                 
 				    ack_time->pri[idx_hy] = 1;
 			    }else{
-				    idx_pri_low++;
-			        /*FILE *fp_lp = fopen("lp.txt","a");
-				    fprintf(fp_lp, "Recv low pri pkt:\n"
-                       "hash_ret:%d\n"
-				       "src_ip:%d\n"
-				       "src_port:%d\n"
-				       "ack_seq:%d\n"
-				       "pri:%d\n"
-				       "total_len:%d\n",
-                       ret,
-				       data->key.ip_src,
-				       data->key.port_src,
-				       data->ack_seq,
-				       req_hy_count[ret].pri,
-				       data->total_len
-				    );
-                    fclose(fp_lp);*/
+		    		idx_pri_low++;
+					FILE *fp_lp = fopen("lp.txt","a");
+					fprintf(fp_lp, "Recv low pri pkt:\n"
+           				"hash_ret:%d\n"
+		   				"src_ip:%d\n"
+		   				"src_port:%d\n"
+		   				"ack_seq:%d\n"
+		   				"pri:%d\n"
+                        "seq_diff:%d\n"
+		   				"total_len:%d\n",
+           				ret,
+		   				data->key.ip_src,
+		   				data->key.port_src,
+		   				data->ack_seq,
+		   				req_hy_count[ret].pri,
+                        data->sent_seq - Maxseq[ret].sent_seq,
+		   				data->total_len
+					);
+        			fclose(fp_lp);
 				    ack_time->pri[idx_hy] = 0;
 			    }
 				ack_time->time[idx_hy++] = ack;
@@ -561,6 +583,7 @@ int response_time_process(struct node_data *data,uint16_t nb_rx,uint16_t socket_
 int res_setup_hash(uint16_t socket_id)
 {
     char s[64];
+    int i;
     /* create ipv4 hash */
     if(conf->enable_http){
         ipv4_req_hash_params.key_len = sizeof(struct http_tuple);
@@ -587,6 +610,11 @@ int res_setup_hash(uint16_t socket_id)
                             "socket %d\n", socket_id);
     else
         printf("Success creat request hash on socket %d\n",socket_id);
+
+    ip_src = (char**)calloc(HM * NM, sizeof(char*));
+    for(i=0; i < HM * NM; i++){
+    	ip_src[i] = (char*)calloc(10, sizeof(char));
+    }
 	/*creat delay time store buffer*/
     thre = CAT_BUFF;
     ack_time = (struct atime*)calloc(1, sizeof(struct atime));
@@ -619,12 +647,15 @@ int burst_count(struct rte_ipv4_hdr *ip_hdr,struct node_data *data,struct timesp
 
     if (likely(req_bit[poffset] == conf->req_label[0] || req_bit[poffset] == conf->req_label[1])) 
     { 
+        request_num++;        
 
         data->key.ip_src = rte_be_to_cpu_32(ip_hdr->src_addr);
  
         id = rte_hash_add_key(burst_lookup_struct[0],(void *) &(data->key));
 
         id = id % IP_NUM;
+
+        sprintf(ip_src[id], "%u.%u", (data->key.ip_src >> 8) & 0xff, (data->key.ip_src & 0xff));
 
         burst[id]++;	
     }
@@ -701,7 +732,7 @@ int packet_process(struct rte_ipv4_hdr *ip_hdr, struct timespec ts_now, int lcor
     if(likely((PrQue[lcore_id]->occupy + 1) % max_size != PrQue[lcore_id]->deque)){
     QType *q = PrQue[lcore_id]->RxQue + PrQue[lcore_id]->occupy;
 #if USE_HTTP
-       la_key = http_parse(ip_hdr, q, ts_now);
+    la_key = http_parse(ip_hdr, q, ts_now);
 #endif
     if(conf->enable_mcc)
        la_key = burst_count(ip_hdr, q, ts_now);
