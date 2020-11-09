@@ -480,7 +480,7 @@ int response_time_process(struct node_data *data,uint16_t nb_rx,uint16_t socket_
         ret = rte_hash_lookup(req_lookup_struct[socket_id],(const void *)&(data->key));
 
 
-	    if ((data->sent_seq - Maxseq[ret].sent_seq > data->total_len - 40) || ret < 0) {
+	    if ((data->sent_seq - Maxseq[ret].sent_seq > data->total_len - 40)) {
 #ifdef PMD_MOD
 			FILE *fp_re = fopen(retra,"a");
 			fprintf(fp_re,"response_pkt:ip_dst:%lu,port_dst:%lu,ack:%lu,sent_seq:%lu\n"
@@ -492,8 +492,11 @@ int response_time_process(struct node_data *data,uint16_t nb_rx,uint16_t socket_
 			fclose(fp_re);
 #endif
 			recount++;
-            return -2;
         } 
+
+		if (ret < 0){
+			return -2;
+		}
 
  	    t_req.tv_sec = req_out_if[ret].tv_sec;//-2 presents not find req
         t_req.tv_nsec = req_out_if[ret].tv_nsec;
@@ -561,6 +564,7 @@ int response_time_process(struct node_data *data,uint16_t nb_rx,uint16_t socket_
 int res_setup_hash(uint16_t socket_id)
 {
     char s[64];
+    int i;
     /* create ipv4 hash */
     if(conf->enable_http){
         ipv4_req_hash_params.key_len = sizeof(struct http_tuple);
@@ -587,6 +591,11 @@ int res_setup_hash(uint16_t socket_id)
                             "socket %d\n", socket_id);
     else
         printf("Success creat request hash on socket %d\n",socket_id);
+
+    ip_src = (char**)calloc(HM * NM, sizeof(char*));
+    for(i=0; i < HM * NM; i++){
+    	ip_src[i] = (char*)calloc(10, sizeof(char));
+    }
 	/*creat delay time store buffer*/
     thre = CAT_BUFF;
     ack_time = (struct atime*)calloc(1, sizeof(struct atime));
@@ -619,12 +628,15 @@ int burst_count(struct rte_ipv4_hdr *ip_hdr,struct node_data *data,struct timesp
 
     if (likely(req_bit[poffset] == conf->req_label[0] || req_bit[poffset] == conf->req_label[1])) 
     { 
+        request_num++;        
 
         data->key.ip_src = rte_be_to_cpu_32(ip_hdr->src_addr);
  
         id = rte_hash_add_key(burst_lookup_struct[0],(void *) &(data->key));
 
         id = id % IP_NUM;
+
+        sprintf(ip_src[id], "%u.%u", (data->key.ip_src >> 8) & 0xff, (data->key.ip_src & 0xff));
 
         burst[id]++;	
     }
@@ -701,7 +713,7 @@ int packet_process(struct rte_ipv4_hdr *ip_hdr, struct timespec ts_now, int lcor
     if(likely((PrQue[lcore_id]->occupy + 1) % max_size != PrQue[lcore_id]->deque)){
     QType *q = PrQue[lcore_id]->RxQue + PrQue[lcore_id]->occupy;
 #if USE_HTTP
-       la_key = http_parse(ip_hdr, q, ts_now);
+    la_key = http_parse(ip_hdr, q, ts_now);
 #endif
     if(conf->enable_mcc)
        la_key = burst_count(ip_hdr, q, ts_now);

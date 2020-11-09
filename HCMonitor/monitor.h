@@ -113,7 +113,11 @@ void cdf_acktime(struct atime *ack_time_pro,unsigned int idx);
 #define BURST_HASH_ENTRIES 128
 #define REQ_HASH_BUCKET  16
 
-#define IP_NUM 105
+#define IP_NUM 6
+
+#define HM 6
+
+#define NM 1
 
 volatile unsigned idx_pri_high;
 volatile unsigned idx_pri_low;
@@ -137,6 +141,7 @@ int packet_process(struct rte_ipv4_hdr *ip_hdr, struct timespec ts_now, int lcor
 int key_extract(struct rte_ipv4_hdr *ip_hdr,struct node_data *data,struct timespec ts_now);
 
 volatile uint32_t burst[IP_NUM];
+volatile char **ip_src;
 volatile uint32_t request_num;
 volatile uint32_t response_num;
 
