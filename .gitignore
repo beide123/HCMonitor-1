@@ -3,7 +3,10 @@ HCMonitor/cdf*
 HCMonitor/time*
 HCMonitor/tag*
 HCMonitor/burst*
+HCMonitor/burst.txt
 HCMonitor/response*
 HCMonitor/err*
 HCMonitor/out*
+HCMonitor/monitor.pcap
+
 
