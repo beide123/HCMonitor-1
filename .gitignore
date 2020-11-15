@@ -8,5 +8,7 @@ HCMonitor/response*
 HCMonitor/err*
 HCMonitor/out*
 HCMonitor/monitor.pcap
+HCMonitor/lp.txt
+HCMonitor/retrans.txt
 
 

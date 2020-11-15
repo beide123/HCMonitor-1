@@ -405,6 +405,8 @@ void lcore_online(void)
 	while(1){
 		//wait for several sec
 		sleep(60);
+	
+		printf("hy_connections:%d\n",conn_active_hy);
 
 		conn_active_mid = conn_active_hy;
 		conn_active_hy = 0;
