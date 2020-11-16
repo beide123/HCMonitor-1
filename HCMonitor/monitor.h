@@ -20,6 +20,8 @@
 //#define MIRROR 1
 #define SAMPLE
 
+#define PRI_DEBUG
+
 #ifdef DEBUG
 extern volatile unsigned long occupy;
 extern volatile unsigned long deque;
@@ -121,6 +123,8 @@ void cdf_acktime(struct atime *ack_time_pro,unsigned int idx);
 
 volatile unsigned idx_pri_high;
 volatile unsigned idx_pri_low;
+volatile unsigned recv_pri_high;
+volatile unsigned recv_pri_low;
 volatile unsigned int conn_active_hy;
 uint32_t pkt_num; //toatl pkts without ack
 uint32_t pkt_req; //request pkts num 

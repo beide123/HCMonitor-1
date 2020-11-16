@@ -1,4 +1,5 @@
 HCMonitor/build/
+HCMonitor/build/*
 HCMonitor/cdf*
 HCMonitor/time*
 HCMonitor/tag*
@@ -8,5 +9,6 @@ HCMonitor/response*
 HCMonitor/err*
 HCMonitor/out*
 HCMonitor/monitor.pcap
+HCMonitor/lp.txt
 
 

@@ -115,7 +115,7 @@ char arlog[20] = "latency_area.txt";
 char artlog[20] = "det_latency.txt";
 #endif
 
-#ifdef PMD_MODE
+#ifdef PRI_DEBUG
 char retra[20] = "retrans.txt";
 #endif
 
@@ -206,9 +206,8 @@ int compInc(const void *a, const void *b)
 
 void clear(void)
 {
-    idx_pri_low = 0;
-    idx_pri_high = 0;
     memset(req_hy_count, 0, sizeof(struct req_vars) * REQ_HASH_ENTRIES);
+    memset(Maxseq, 0, sizeof(struct req_temp) * REQ_HASH_ENTRIES);
 }
 
 float avg(float a[],unsigned int n)
@@ -293,8 +292,11 @@ void cdf_acktime(struct atime *ack_time_pro,unsigned int idx)
 	fprintf(fp, "connections:%d,retrans:%d,avg_delay:%f\n",
 			conn_active_mid,recount,avg_delay);
 	fprintf(fp, "recv_pri_high:%d, recv_pri_low:%d.\n"
+                "resp_pri_high:%d, resp_pri_low:%d.\n"
                 "pri_high_num:%d,low_pri_num:%d\n",
-            idx_pri_high, idx_pri_low, num_high,num_low);
+                recv_pri_high, recv_pri_low,
+ 				idx_pri_high, idx_pri_low, 
+                num_high,num_low);
 	fprintf(fp, "CDF: %9s: %18s: %26s:\n","total","high_pri","low_pri");
 	
 	recount = 0;
@@ -403,6 +405,8 @@ void lcore_online(void)
 	while(1){
 		//wait for several sec
 		sleep(60);
+	
+		printf("hy_connections:%d\n",conn_active_hy);
 
 		conn_active_mid = conn_active_hy;
 		conn_active_hy = 0;
@@ -417,6 +421,10 @@ void lcore_online(void)
 			idx = idx_hy;
 			idx_hy = 0;
 			cdf_acktime(ack_time_hy,idx);
+    		idx_pri_low = 0;
+    		idx_pri_high = 0;
+    		recv_pri_low = 0;
+    		recv_pri_high = 0;
 		}else{
 			lock_flag = 1;			
 		}
@@ -448,11 +456,11 @@ int response_time_process(struct node_data *data,uint16_t nb_rx,uint16_t socket_
 		
         //traffic += data->total_len + 14; 
         if(data->pri == conf->pri_high_label){
-		    //idx_pri_high++;				                 
+		    recv_pri_high++;				                 
 		    req_hy_count[ret_req].pri = 1;
         }else{
-        	//idx_pri_low++;
-		    req_hy_count[ret_req].pri = 2;
+            recv_pri_low++;
+		    req_hy_count[ret_req].pri = data->pri;
 	    }
 
     	if(Maxseq[ret_req].sent_seq < data->sent_seq)
@@ -481,17 +489,28 @@ int response_time_process(struct node_data *data,uint16_t nb_rx,uint16_t socket_
 
 
 	    if ((data->sent_seq - Maxseq[ret].sent_seq > data->total_len - 40)) {
-#ifdef PMD_MOD
+#ifdef PRI_DEBUG
 			FILE *fp_re = fopen(retra,"a");
 			fprintf(fp_re,"response_pkt:ip_dst:%lu,port_dst:%lu,ack:%lu,sent_seq:%lu\n"
 						  "request_pkt:ip_src:%lu,port_src:%lu,sent_seq:%lu,ack:%lu\n"
+                          "seq_diff:%d\n"
+                          "total_len:%d\n"
 						  "====================\n",
-							(data->key.ip_src & 0xff),data->key.port_src,data->sent_seq,
-							data->ack_seq,(Maxseq[ret].ip_src & 0xff),Maxseq[ret].port_src,
-							Maxseq[ret].sent_seq,Maxseq[ret].ack_seq);
-			fclose(fp_re);
+							(data->key.ip_src & 0xff),
+							data->key.port_src,
+							data->sent_seq,
+							data->ack_seq,
+							(Maxseq[ret].ip_src & 0xff),
+							Maxseq[ret].port_src,
+							Maxseq[ret].sent_seq,
+							Maxseq[ret].ack_seq,
+                            data->sent_seq - Maxseq[ret].sent_seq,
+							data->total_len);
+							fclose(fp_re);
 #endif
 			recount++;
+			
+			return -2;
         } 
 
 		if (ret < 0){
@@ -525,27 +544,29 @@ int response_time_process(struct node_data *data,uint16_t nb_rx,uint16_t socket_
 				req_hy_count[ret].idx,req_stamp,resp_stamp,ack);			
 			    fclose(fp_art);
 #endif
-			    if(req_hy_count[ret].pri == 1){
+			    if(req_hy_count[ret].pri){
 				    idx_pri_high++;				                 
 				    ack_time->pri[idx_hy] = 1;
 			    }else{
-				    idx_pri_low++;
-			        /*FILE *fp_lp = fopen("lp.txt","a");
-				    fprintf(fp_lp, "Recv low pri pkt:\n"
-                       "hash_ret:%d\n"
-				       "src_ip:%d\n"
-				       "src_port:%d\n"
-				       "ack_seq:%d\n"
-				       "pri:%d\n"
-				       "total_len:%d\n",
-                       ret,
-				       data->key.ip_src,
-				       data->key.port_src,
-				       data->ack_seq,
-				       req_hy_count[ret].pri,
-				       data->total_len
-				    );
-                    fclose(fp_lp);*/
+		    		idx_pri_low++;
+					FILE *fp_lp = fopen("lp.txt","a");
+					fprintf(fp_lp, "Recv low pri pkt:\n"
+           				"hash_ret:%d\n"
+		   				"src_ip:%d\n"
+		   				"src_port:%d\n"
+		   				"ack_seq:%d\n"
+		   				"pri:%d\n"
+                        "seq_diff:%d\n"
+		   				"total_len:%d\n",
+           				ret,
+		   				data->key.ip_src,
+		   				data->key.port_src,
+		   				data->ack_seq,
+		   				req_hy_count[ret].pri,
+                        data->sent_seq - Maxseq[ret].sent_seq,
+		   				data->total_len
+					);
+        			fclose(fp_lp);
 				    ack_time->pri[idx_hy] = 0;
 			    }
 				ack_time->time[idx_hy++] = ack;
