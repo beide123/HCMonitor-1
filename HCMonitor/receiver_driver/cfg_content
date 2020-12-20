@@ -1,0 +1,45 @@
+
+########################################################
+##            receiver related information            ##
+########################################################
+
+[DMA]
+#DMA BUFFER info
+#DMA_BUFFER_ADDRESS       =   0x0000000090000000ULL      #2.25G
+#DMA_BUFFER_TOTAL_SIZE    =   0x0000000020000000ULL      #0.5G
+#DMA_BUFFER_SEGMENT_SIZE  =   0x0000000004000000ULL      #8MB
+#DMA_CONTROL_REGISTER     =   0x000000008ff00000ULL      #2.25G-1
+
+DMA_BUFFER_ADDRESS	= 0x0000000050000000ULL #	1.25G
+DMA_BUFFER_TOTAL_SIZE	= 0x0000000030000000ULL #	0.75G
+#DMA_BUFFER_TOTAL_SIZE	= 0x0000000070000000ULL #	1.75G
+DMA_BUFFER_SEGMENT_SIZE	= 0x0000000004000000ULL #	64MB
+DMA_CONTROL_REGISTER	= 0x000000004ff00000ULL #	1.25G-1M
+
+
+#########################################################
+##             sender related information              ##
+#########################################################
+
+[COMMAND]
+#Config Space info
+cfg_start                =   0x00000001f0000000ULL       
+cfg_end                  =   0x00000001f0001000ULL       #+4K,at least a page
+
+[SAMPLE]
+#Sample Address Space info
+#sample_start1            =   0x0000000080000000ULL       
+#sample_end1              =   0x0000000100000000ULL       
+sample_start1            =   0x0000000000000000ULL       
+#sample_end1              =   0x00000001e0000000ULL       
+sample_end1              =   0x00000001bfffffffULL       
+#sample_start1            =   0x0000000000000000ULL       
+#sample_end1              =   0x00000001ffffffffULL       
+# 2014-12-25 sample_start2 is modified by wzp, sample_start2 is used to control data rate. 
+#sample_start2            =   0x0000000000000007ULL
+sample_start2            =   0x0000000000000000ULL
+sample_end2              =   0x0000000000000000ULL
+sample_start3            =   0x0000000000000000ULL
+sample_end3              =   0x0000000000000000ULL
+sample_start4            =   0x0000000000000000ULL
+sample_end4              =   0x0000000000000000ULL

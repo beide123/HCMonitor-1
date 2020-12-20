@@ -4,11 +4,11 @@
 #include <sys/time.h>
 
 #define BUFSIZE 20000000
-#define MAX_QUE_NUM 8
+#define MAX_QUE_NUM 1
 #define QUESIZE (BUFSIZE / MAX_QUE_NUM)
 
 struct burst_tuple {
-        uint32_t ip_src;
+	uint32_t ip_src;
 };
 
 struct ipv4_2tuple {

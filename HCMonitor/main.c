@@ -97,12 +97,23 @@ char rlog[20] = "response.txt";
 #define TIMER_LCORE (MONITOR_LCORE+1)
 #define CDF_LCORE (TIMER_LCORE+1)
 #define TSTAMP_LCORE (CDF_LCORE+1)
+#define PCAP_LCORE (TSTAMP_LCORE+1)
+#define SSD_LCORE (PCAP_LCORE+1)
 
 
 /*
  * Configurable number of RX/TX ring descriptors
  */
 struct rte_ring *output_ring[RTE_MAX_ETHPORTS];
+
+struct ssd_queue{
+	struct rte_mbuf **ring;
+	volatile unsigned long occupy;
+    volatile unsigned long deque;	
+};
+
+typedef struct ssd_queue* ssd_t;
+ssd_t *SSD_Ring;
 
 #define RTE_TEST_RX_DESC_DEFAULT 128
 #define RTE_TEST_TX_DESC_DEFAULT 512
@@ -411,17 +422,6 @@ l2fwd_simple_forward(struct rte_mbuf *m, unsigned portid, struct timespec ts_now
 
         tcp = (struct rte_tcp_hdr *)((unsigned char *) ip_hdr + sizeof(struct rte_ipv4_hdr));
 		uint16_t total_len = rte_be_to_cpu_16(ip_hdr->total_length);
-#ifdef PMD_MODE
-            int ret;
-            char *buff = rte_pktmbuf_mtod(m, char*);
-            pcap_header ph;
-            ph.ts.ts_sec = ts_now.tv_sec;
-            ph.ts.ts_usec = ts_now.tv_nsec / 1000;
-            ph.capture_len = m->pkt_len;
-            ph.len = m->pkt_len;
-            ret = fwrite(&ph, sizeof(pcap_header), 1, fp_out);
-            ret = fwrite(buff, 1, ph.capture_len, fp_out);
-#else
 	    if (likely((uint8_t)ip_hdr->next_proto_id == 6 && 
 			total_len > sizeof(struct rte_ipv4_hdr) + ((tcp->data_off & 0xf0) >> 2)))
 	    {
@@ -431,7 +431,6 @@ l2fwd_simple_forward(struct rte_mbuf *m, unsigned portid, struct timespec ts_now
 				err++;
     			//printf("packet process failed!\n");
 		}
-#endif
 	}
 	rte_pktmbuf_free(m);
 	//l2fwd_send_packet(m, (uint8_t) dst_port);
@@ -456,13 +455,12 @@ l2fwd_simple_forward(struct rte_mbuf *m, unsigned portid, struct timespec ts_now
 #endif
 }
 
-
 /* main processing loop */
 static void
 l2fwd_main_loop(void)
 {
 	struct rte_mbuf *pkts_burst[MAX_PKT_BURST];
-	struct rte_mbuf *m;
+	struct rte_mbuf *m, *ssd;
 	unsigned lcore_id;
 	uint64_t prev_tsc, diff_tsc, cur_tsc, timer_tsc;
 	uint64_t prev_sta,diff_sta,cur_sta,timer_sta;
@@ -479,6 +477,35 @@ l2fwd_main_loop(void)
 	lcore_id = rte_lcore_id();
 	
 	qconf = &lcore_queue_conf[lcore_id];
+
+#ifdef PMD_MODE	
+	if(lcore_id == PCAP_LCORE){
+		int ret;
+        for(i = 0; i < MAX_QUE_NUM; i++){
+			struct rte_mbuf *m = SSD_Ring[i]->ring + SSD_Ring[i]->deque;
+			ts_now.tv_sec = ts.tv_sec;
+			ts_now.tv_nsec = ts.tv_nsec;
+			if(SSD_Ring[i]->occupy != SSD_Ring[i]->deque){
+				ret = trans_pcap(m, ts_now, lcore_id);
+                SSD_Ring[i]->deque = (SSD_Ring[i]->deque + 1) % SSD_NUM;
+            }
+
+		}
+	}
+
+	if(lcore_id == SSD_LCORE){
+		int ret;
+		for(i = 0; i < MAX_QUE_NUM; i++){
+			if(PP_Ring[i]->occupy != PP_Ring[i]->deque){
+				pcap_t pp = PP_Ring[i]->ring + PP_Ring[i]->deque;
+		    	ret = fwrite(&pp->ph, sizeof(pcap_header), 1, fp_out);
+				ret = fwrite(pp->buff, 1, pp->ph.capture_len, fp_out);	
+                PP_Ring[i]->deque = (PP_Ring[i]->deque + 1) % SSD_NUM;
+            }
+
+		}
+    }
+#endif
 
 	if(lcore_id == MONITOR_LCORE){
         int time = 0;
@@ -618,9 +645,22 @@ l2fwd_main_loop(void)
 			for (j = 0; j < nb_rx; j++) {
 				m = pkts_burst[j];
 				rte_prefetch0(rte_pktmbuf_mtod(m, void *));
+#ifdef PMD_MODE
+				if(likely((SSD_Ring[lcore_id]->occupy + 1) % SSD_NUM != SSD_Ring[lcore_id]->deque)){
+					ssd = SSD_Ring[lcore_id]->ring[SSD_Ring[lcore_id]->occupy];
+					memcpy(ssd, m, sizeof(struct rte_mbuf));
+					SSD_Ring[lcore_id]->occupy = (SSD_Ring[lcore_id]->occupy + 1) & SSD_NUM;
+					_mm_sfence();
+				}else{
+					printf("EXCP:SSD buffer is Full!\n");
+				}
+				rte_pktmbuf_free(m);
+            	pkt_free[lcore_id] +=1;
+#else
 				ts_now.tv_sec = ts.tv_sec;
 				ts_now.tv_nsec = ts.tv_nsec;
 				l2fwd_simple_forward(m, portid, ts_now, lcore_id);
+#endif
 			}
 		}
 	}
@@ -1019,12 +1059,28 @@ main(int argc, char **argv)
 #endif
 
 #ifdef PMD_MODE
+	int i, j;
     pcap_file_header pfh;
     FILE *fp_in = fopen(PCAP_IN_FILE, "r");
     fp_out = fopen(PCAP_OUT_FILE, "w");
     fread(&pfh, sizeof(pcap_file_header), 1, fp_in);
     ret = fwrite(&pfh, sizeof(pcap_file_header), 1, fp_out);
     fclose(fp_out);
+	SSD_Ring = (ssd_t*)calloc(1, sizeof(ssd_t));
+	PP_Ring = (pp_que_t*)calloc(1, sizeof(pp_que_t));
+    for(i = 0; i < 1; i++){
+        SSD_Ring[i] = (ssd_t)calloc(1, sizeof(struct ssd_queue));
+        SSD_Ring[i]->deque = SSD_Ring[i]->occupy = 0;
+        SSD_Ring[i]->ring = (struct rte_mbuf**)calloc(SSD_NUM, sizeof(struct rte_mbuf*));
+        PP_Ring[i] = (pp_que_t)calloc(1, sizeof(struct pcap_queue));
+        PP_Ring[i]->deque = PP_Ring[i]->occupy = 0;
+        PP_Ring[i]->ring = (pcap_t*)calloc(SSD_NUM, sizeof(pcap_t));
+		for(j = 0; j < SSD_NUM; j++){
+        	PP_Ring[i]->ring[j] = (pcap_t*)calloc(1, sizeof(struct to_pcap));
+        	SSD_Ring[i]->ring[j] = (struct rte_mbuf*)calloc(1, sizeof(struct rte_mbuf));
+        	//PP_Ring[i]->ring[j]->buff = (char*)calloc(1, sizeof(char));
+		}
+    }
 #endif	
 
 	check_all_ports_link_status(nb_ports, l2fwd_enabled_port_mask);

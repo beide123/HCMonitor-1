@@ -1,0 +1,5 @@
+#!/bin/sh
+
+rmmod hmtt_pcie_driver || exit 1
+
+rm -f /dev/hmtt_pcie

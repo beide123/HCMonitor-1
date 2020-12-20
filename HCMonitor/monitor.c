@@ -510,7 +510,7 @@ int response_time_process(struct node_data *data,uint16_t nb_rx,uint16_t socket_
 #endif
 			recount++;
 			
-			return -2;
+			//return -2;
         } 
 
 		if (ret < 0){

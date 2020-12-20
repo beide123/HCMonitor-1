@@ -10,6 +10,8 @@
 
 #include <sys/time.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <stdint.h>
 #include "rx_queue.h"
 #include "send_sql.h"
 
@@ -28,12 +30,12 @@ extern volatile unsigned long deque;
 #endif
 
 
-//#define PMD_MODE
+#define PMD_MODE
 
 #ifdef PMD_MODE
 
 FILE *fp_out;
-#define PCAP_OUT_FILE "monitor.pcap"
+#define PCAP_OUT_FILE "/mnt/sdb1/monitor.pcap"
 #define PCAP_IN_FILE "input.pcap"
 typedef struct pcap_file_header 
 {
@@ -58,6 +60,26 @@ typedef struct pcap_header
 	uint32_t capture_len;
 	uint32_t len;
 } pcap_header;
+
+struct to_pcap
+{
+	char *buff;
+    pcap_header ph;
+};
+
+typedef struct to_pcap* pcap_t;
+
+struct pcap_queue{
+	pcap_t *ring;
+	volatile unsigned long occupy;
+    volatile unsigned long deque;
+};
+
+typedef struct pcap_queue* pp_que_t;
+
+pp_que_t *PP_Ring;
+
+#define SSD_NUM 50000
 
 #endif
 
@@ -143,6 +165,8 @@ struct timespec ts;
 
 int packet_process(struct rte_ipv4_hdr *ip_hdr, struct timespec ts_now, int lcore_id);
 int key_extract(struct rte_ipv4_hdr *ip_hdr,struct node_data *data,struct timespec ts_now);
+
+int trans_pcap(struct rte_mbuf *m, struct timespec ts_now, int lcore_id);
 
 volatile uint32_t burst[IP_NUM];
 volatile char **ip_src;

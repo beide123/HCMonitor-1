@@ -5,7 +5,7 @@ RTE_SDK=/home/songhui/dpdk-stable-19.11.4
 APP = monitor
 
 # all source are stored in SRCS-y
-SRCS-y := main.c config.c monitor.c rx_queue.c http_parse.c send_sql.c
+SRCS-y := main.c config.c monitor.c rx_queue.c http_parse.c send_sql.c ssd_trace.c
 
 # Build using pkg-config variables if possible
 ifeq ($(shell pkg-config --exists libdpdk && echo 0),0)
