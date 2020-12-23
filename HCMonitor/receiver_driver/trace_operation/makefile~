@@ -1,2 +1,0 @@
-all: trace_collect.c 
-	gcc -o trace_collect trace_collect.c -O2 -lpthread
