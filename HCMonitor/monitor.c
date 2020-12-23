@@ -549,7 +549,7 @@ int response_time_process(struct node_data *data,uint16_t nb_rx,uint16_t socket_
 				    ack_time->pri[idx_hy] = 1;
 			    }else{
 		    		idx_pri_low++;
-					FILE *fp_lp = fopen("lp.txt","a");
+					/*FILE *fp_lp = fopen("lp.txt","a");
 					fprintf(fp_lp, "Recv low pri pkt:\n"
            				"hash_ret:%d\n"
 		   				"src_ip:%d\n"
@@ -566,7 +566,7 @@ int response_time_process(struct node_data *data,uint16_t nb_rx,uint16_t socket_
                         data->sent_seq - Maxseq[ret].sent_seq,
 		   				data->total_len
 					);
-        			fclose(fp_lp);
+        			fclose(fp_lp);*/
 				    ack_time->pri[idx_hy] = 0;
 			    }
 				ack_time->time[idx_hy++] = ack;

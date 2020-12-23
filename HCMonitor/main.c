@@ -480,31 +480,36 @@ l2fwd_main_loop(void)
 
 #ifdef PMD_MODE	
 	if(lcore_id == PCAP_LCORE){
-		int ret;
-        for(i = 0; i < MAX_QUE_NUM; i++){
-			struct rte_mbuf *m = SSD_Ring[i]->ring + SSD_Ring[i]->deque;
+	    int ret;
+	    while(1){
+        	for(i = 0; i < MAX_QUE_NUM; i++){
 			ts_now.tv_sec = ts.tv_sec;
 			ts_now.tv_nsec = ts.tv_nsec;
 			if(SSD_Ring[i]->occupy != SSD_Ring[i]->deque){
-				ret = trans_pcap(m, ts_now, lcore_id);
-                SSD_Ring[i]->deque = (SSD_Ring[i]->deque + 1) % SSD_NUM;
-            }
+				struct rte_mbuf *m = SSD_Ring[i]->ring[SSD_Ring[i]->deque];
+				ret = trans_pcap(m, ts_now, i);
+                		SSD_Ring[i]->deque = (SSD_Ring[i]->deque + 1) % SSD_NUM;
+            		}
 
 		}
+	    }
 	}
 
 	if(lcore_id == SSD_LCORE){
-		int ret;
-		for(i = 0; i < MAX_QUE_NUM; i++){
-			if(PP_Ring[i]->occupy != PP_Ring[i]->deque){
-				pcap_t pp = PP_Ring[i]->ring + PP_Ring[i]->deque;
-		    	ret = fwrite(&pp->ph, sizeof(pcap_header), 1, fp_out);
-				ret = fwrite(pp->buff, 1, pp->ph.capture_len, fp_out);	
-                PP_Ring[i]->deque = (PP_Ring[i]->deque + 1) % SSD_NUM;
-            }
+	    int ret;
+            pcap_header ph;
+            while(1){
+                for(i = 0; i < MAX_QUE_NUM; i++){
+		        if(PP_Ring[i]->occupy != PP_Ring[i]->deque){
+			    pcap_t p = PP_Ring[i]->ring[PP_Ring[i]->deque];
+		    	    ret = fwrite(&p->ph, sizeof(pcap_header), 1, fp_out);
+			    ret = fwrite(p->buff, 1, p->ph.capture_len, fp_out);	
+                            PP_Ring[i]->deque = (PP_Ring[i]->deque + 1) % SSD_NUM;
+                        }
 
 		}
-    }
+	    }
+        }
 #endif
 
 	if(lcore_id == MONITOR_LCORE){
@@ -649,7 +654,7 @@ l2fwd_main_loop(void)
 				if(likely((SSD_Ring[lcore_id]->occupy + 1) % SSD_NUM != SSD_Ring[lcore_id]->deque)){
 					ssd = SSD_Ring[lcore_id]->ring[SSD_Ring[lcore_id]->occupy];
 					memcpy(ssd, m, sizeof(struct rte_mbuf));
-					SSD_Ring[lcore_id]->occupy = (SSD_Ring[lcore_id]->occupy + 1) & SSD_NUM;
+					SSD_Ring[lcore_id]->occupy = (SSD_Ring[lcore_id]->occupy + 1) % SSD_NUM;
 					_mm_sfence();
 				}else{
 					printf("EXCP:SSD buffer is Full!\n");
@@ -1059,15 +1064,15 @@ main(int argc, char **argv)
 #endif
 
 #ifdef PMD_MODE
-	int i, j;
+    int i, j;
     pcap_file_header pfh;
     FILE *fp_in = fopen(PCAP_IN_FILE, "r");
     fp_out = fopen(PCAP_OUT_FILE, "w");
     fread(&pfh, sizeof(pcap_file_header), 1, fp_in);
     ret = fwrite(&pfh, sizeof(pcap_file_header), 1, fp_out);
-    fclose(fp_out);
-	SSD_Ring = (ssd_t*)calloc(1, sizeof(ssd_t));
-	PP_Ring = (pp_que_t*)calloc(1, sizeof(pp_que_t));
+    //fclose(fp_out);
+    SSD_Ring = (ssd_t*)calloc(1, sizeof(ssd_t));
+    PP_Ring = (pp_que_t*)calloc(1, sizeof(pp_que_t));
     for(i = 0; i < 1; i++){
         SSD_Ring[i] = (ssd_t)calloc(1, sizeof(struct ssd_queue));
         SSD_Ring[i]->deque = SSD_Ring[i]->occupy = 0;

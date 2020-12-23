@@ -35,7 +35,7 @@ extern volatile unsigned long deque;
 #ifdef PMD_MODE
 
 FILE *fp_out;
-#define PCAP_OUT_FILE "/mnt/sdb1/monitor.pcap"
+#define PCAP_OUT_FILE "monitor.pcap"
 #define PCAP_IN_FILE "input.pcap"
 typedef struct pcap_file_header 
 {
