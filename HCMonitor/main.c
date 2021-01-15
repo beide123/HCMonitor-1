@@ -180,6 +180,7 @@ static const struct rte_eth_conf port_conf = {
         .rss_conf = {
             .rss_key = NULL,
             .rss_hf = ETH_RSS_E1000_IGB,
+			//ETH_RSS_I40E,
         },
     },
     .txmode = {
@@ -212,7 +213,7 @@ unsigned pkt_free[MAX_QUE_NUM];
 /* A tsc-based timer responsible for triggering statistics printout */
 #define TIMER_MILLISECOND 2200000ULL /* around 1ms at 2 Ghz */
 #define MAX_TIMER_PERIOD 86400 /* 1 day max */
-static int64_t timer_period = 10 * TIMER_MILLISECOND * 1; /* default period is 10 ms */
+static int64_t timer_period = 5 * TIMER_MILLISECOND * 1; /* default period is 10 ms */
 static int64_t timer_stper = 1 * TIMER_MILLISECOND * 1000; /* default period is 1 seconds */
 
 /* Print out statistics on packets dropped */
@@ -411,14 +412,27 @@ l2fwd_simple_forward(struct rte_mbuf *m, unsigned portid, struct timespec ts_now
 
         tcp = (struct rte_tcp_hdr *)((unsigned char *) ip_hdr + sizeof(struct rte_ipv4_hdr));
 		uint16_t total_len = rte_be_to_cpu_16(ip_hdr->total_length);
+#ifdef PMD_MODE
+            int ret;
+            char *buff = rte_pktmbuf_mtod(m, char*);
+            pcap_header ph;
+            ph.ts.ts_sec = ts_now.tv_sec;
+            ph.ts.ts_usec = ts_now.tv_nsec / 1000;
+            ph.capture_len = m->pkt_len;
+            ph.len = m->pkt_len;
+            ret = fwrite(&ph, sizeof(pcap_header), 1, fp_out);
+            ret = fwrite(buff, 1, ph.capture_len, fp_out);
+#else
 	    if (likely((uint8_t)ip_hdr->next_proto_id == 6 && 
-			total_len > sizeof(struct rte_ipv4_hdr) + sizeof(struct rte_tcp_hdr) + (tcp->data_off >> 2)))
+			total_len > sizeof(struct rte_ipv4_hdr) + ((tcp->data_off & 0xf0) >> 2)))
 	    {
 			port_statistics[portid].tcp_psh++;
+
     		if(!(packet_process(ip_hdr, ts_now, lcore_id)))
 				err++;
     			//printf("packet process failed!\n");
 		}
+#endif
 	}
 	rte_pktmbuf_free(m);
 	//l2fwd_send_packet(m, (uint8_t) dst_port);
@@ -527,8 +541,9 @@ l2fwd_main_loop(void)
 			
 
 	if(lcore_id == TIMER_LCORE){
-		RTE_LOG(INFO, L2FWD, "entering timer loop on lcore %u\n", lcore_id);
+	    RTE_LOG(INFO, L2FWD, "entering timer loop on lcore %u\n", lcore_id);
         FILE *fp_r = fopen(rlog,"a");
+        int i;
 		while(1){
 		
 			cur_tsc = rte_rdtsc();
@@ -549,16 +564,18 @@ l2fwd_main_loop(void)
 					if (unlikely(timer_tsc >= (uint64_t) timer_period)) {
 							/* reset the timer */
 							timer_tsc = 0;
+                            if(conf->enable_mcc){
 							//uint64_t start_t = rte_rdtsc();
-							if(burst){
 	    						FILE *fp = fopen(blog, "a");			
-								fprintf(fp,"%d\n",burst);//,start_t);
+								for(i = 0; i < IP_NUM; i++){
+								fprintf(fp,"%s:",ip_src[i]);//,start_t);
+								fprintf(fp,"%d,",burst[i]);//,start_t);
+                                burst[i] = 0;
+                            	}
+								fprintf(fp,"%d\n",request_num);//,start_t);
 								fclose(fp);
-							}
-							//fprintf(fp_r,"%d\n",response_num);//,start_t);
-							burst = 0;
-							//response_num = 0;
-						
+                            	request_num = 0;
+                            }
 					}
 				}
 			
@@ -604,7 +621,6 @@ l2fwd_main_loop(void)
 				rte_prefetch0(rte_pktmbuf_mtod(m, void *));
 				ts_now.tv_sec = ts.tv_sec;
 				ts_now.tv_nsec = ts.tv_nsec;
-				burst++;
 				l2fwd_simple_forward(m, portid, ts_now, lcore_id);
 			}
 		}
@@ -845,7 +861,7 @@ main(int argc, char **argv)
 		}
 	}
 
-	nb_ports = rte_eth_dev_count();
+	nb_ports = rte_eth_dev_count_avail();
 	nr_ports = nb_ports;
 	
 	if (nb_ports == 0)
@@ -1001,6 +1017,15 @@ main(int argc, char **argv)
 		res_setup_hash(0);
 		InitQueue();
 		Qcur = KeyQue;
+#endif
+
+#ifdef PMD_MODE
+    pcap_file_header pfh;
+    FILE *fp_in = fopen(PCAP_IN_FILE, "r");
+    fp_out = fopen(PCAP_OUT_FILE, "w");
+    fread(&pfh, sizeof(pcap_file_header), 1, fp_in);
+    ret = fwrite(&pfh, sizeof(pcap_file_header), 1, fp_out);
+    fclose(fp_out);
 #endif	
 
 	check_all_ports_link_status(nb_ports, l2fwd_enabled_port_mask);

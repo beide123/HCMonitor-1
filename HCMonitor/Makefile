@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright(c) 2010-2014 Intel Corporation
+RTE_SDK=/home/songhui/dpdk-stable-19.08.2
+RTE_TARGET=x86_64-native-linux-gcc
 # binary name
 APP = monitor
 
@@ -19,7 +21,7 @@ static: build/$(APP)-static
 PKGCONF=pkg-config --define-prefix
 
 PC_FILE := $(shell $(PKGCONF) --path libdpdk)
-CFLAGS += -O3 $(shell $(PKGCONF) --cflags libdpdk)
+CFLAGS += $(shell $(PKGCONF) --cflags libdpdk)
 LDFLAGS_SHARED = $(shell $(PKGCONF) --libs libdpdk)
 LDFLAGS_STATIC = -Wl,-Bstatic $(shell $(PKGCONF) --static --libs libdpdk)
 
@@ -48,7 +50,7 @@ RTE_TARGET ?= $(notdir $(abspath $(dir $(firstword $(wildcard $(RTE_SDK)/*/.conf
 
 include $(RTE_SDK)/mk/rte.vars.mk
 
-CFLAGS += -O0
+CFLAGS += -g -O0
 CFLAGS += $(WERROR_FLAGS) -lconfig -L /usr/lib64/mysql -l mysqlclient
 
 include $(RTE_SDK)/mk/rte.extapp.mk

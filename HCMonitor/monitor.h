@@ -20,6 +20,8 @@
 //#define MIRROR 1
 #define SAMPLE
 
+#define PRI_DEBUG
+
 #ifdef DEBUG
 extern volatile unsigned long occupy;
 extern volatile unsigned long deque;
@@ -110,10 +112,19 @@ void cdf_acktime(struct atime *ack_time_pro,unsigned int idx);
 
 /* dequeue the meta data and caculate response time */
 #define REQ_HASH_ENTRIES 1024*1024*16
+#define BURST_HASH_ENTRIES 128
 #define REQ_HASH_BUCKET  16
+
+#define IP_NUM 2
+
+#define HM 2
+
+#define NM 1
 
 volatile unsigned idx_pri_high;
 volatile unsigned idx_pri_low;
+volatile unsigned recv_pri_high;
+volatile unsigned recv_pri_low;
 volatile unsigned int conn_active_hy;
 uint32_t pkt_num; //toatl pkts without ack
 uint32_t pkt_req; //request pkts num 
@@ -133,7 +144,9 @@ struct timespec ts;
 int packet_process(struct rte_ipv4_hdr *ip_hdr, struct timespec ts_now, int lcore_id);
 int key_extract(struct rte_ipv4_hdr *ip_hdr,struct node_data *data,struct timespec ts_now);
 
-volatile uint32_t burst;
+volatile uint32_t burst[IP_NUM];
+volatile char **ip_src;
+volatile uint32_t request_num;
 volatile uint32_t response_num;
 
 #endif

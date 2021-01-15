@@ -16,7 +16,6 @@
 
 #define MIRROR
 
-#define USE_HTTP
 
 #define MAXLABEL 2
 
@@ -31,6 +30,7 @@ struct mconfig
 {
     int  enable_http;    //network type IOT/normal HTTP. 1: HTTP, else IOT
     int  enable_hy;      //server platform. 1:Hy,else x86
+    int  enable_mcc;
 
     /*parse request/response packet in IOT network*/
     int req_label[MAXLABEL];  //labels for request judge
@@ -52,6 +52,13 @@ struct mconfig* initConfig();
 int getConfig(struct mconfig *conf);
 
 struct mconfig *conf;
+
+int enable_http;
+int enable_mcc;
+
+#define USE_HTTP (enable_http)
+
+#define MCC_DBG  (enable_mcc)
 
 uint32_t pkt_num;
 

@@ -4,8 +4,12 @@
 #include <sys/time.h>
 
 #define BUFSIZE 20000000
-#define MAX_QUE_NUM 2
+#define MAX_QUE_NUM 8
 #define QUESIZE (BUFSIZE / MAX_QUE_NUM)
+
+struct burst_tuple {
+        uint32_t ip_src;
+};
 
 struct ipv4_2tuple {
 	uint32_t ip_src;
@@ -19,9 +23,11 @@ struct http_tuple {
 };
 
 typedef struct node_data{
-#ifdef USE_HTTP
+#if USE_HTTP
     int status;
     struct http_tuple key;
+#elif MCC_DBG
+    struct burst_tuple key;
 #else
     struct ipv4_2tuple key;
 #endif

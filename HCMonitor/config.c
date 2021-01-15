@@ -32,6 +32,7 @@ int getConfig(struct mconfig *conf)
 
     config_lookup_int(&cfg, "enableHTTP", &(conf->enable_http));
     config_lookup_int(&cfg, "enableHY", &(conf->enable_hy));
+    config_lookup_int(&cfg, "enableMCC", &(conf->enable_mcc));
     config_lookup_int(&cfg, "enablePri", &(conf->enable_pri));
     config_lookup_int(&cfg, "enablePython", &(conf->enable_python));
     config_lookup_int(&cfg, "enableSQL", &(conf->enable_sql));
@@ -51,6 +52,8 @@ int getConfig(struct mconfig *conf)
     config_lookup_int(&cfg, "PriLabelLow", &(conf->pri_low_label));
 
     printf("Enable HTTP: %d\n", conf->enable_http);
+    enable_http = conf->enable_http;
+    enable_mcc = conf->enable_mcc;
     config_destroy(&cfg);
     return 0;
 }

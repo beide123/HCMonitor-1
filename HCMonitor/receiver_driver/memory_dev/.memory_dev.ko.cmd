@@ -1,0 +1,1 @@
+cmd_/root/receiver_driver/memory_dev/memory_dev.ko := ld -r -m elf_x86_64  -z max-page-size=0x200000 -T ./scripts/module-common.lds  --build-id  -o /root/receiver_driver/memory_dev/memory_dev.ko /root/receiver_driver/memory_dev/memory_dev.o /root/receiver_driver/memory_dev/memory_dev.mod.o ;  true

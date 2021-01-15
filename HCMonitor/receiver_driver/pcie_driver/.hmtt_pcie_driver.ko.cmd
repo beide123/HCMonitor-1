@@ -1,0 +1,1 @@
+cmd_/root/receiver_driver/pcie_driver/hmtt_pcie_driver.ko := ld -r -m elf_x86_64  -z max-page-size=0x200000 -T ./scripts/module-common.lds  --build-id  -o /root/receiver_driver/pcie_driver/hmtt_pcie_driver.ko /root/receiver_driver/pcie_driver/hmtt_pcie_driver.o /root/receiver_driver/pcie_driver/hmtt_pcie_driver.mod.o ;  true

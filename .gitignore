@@ -1,3 +1,15 @@
 HCMonitor/build/
-HCMonitor/cdf.txt
+HCMonitor/cdf*
+HCMonitor/time*
+HCMonitor/tag*
+HCMonitor/burst*
+HCMonitor/burst.txt
+HCMonitor/response*
+HCMonitor/err*
+HCMonitor/out*
+HCMonitor/monitor.pcap
+HCMonitor/lp.txt
+HCMonitor/retrans.txt
+HCMonitor/receive_driver/*
+
 
