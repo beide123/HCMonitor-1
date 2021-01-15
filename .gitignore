@@ -10,6 +10,6 @@ HCMonitor/out*
 HCMonitor/monitor.pcap
 HCMonitor/lp.txt
 HCMonitor/retrans.txt
-HCMonitor/receive_driver/*
+HCMonitor/receiver_driver/*
 
 
