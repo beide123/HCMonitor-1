@@ -1,2 +1,0 @@
-#!/bin/bash
-echo `lspci -x -d 10ee:6014 | awk '{print $2}'`

@@ -1,4 +1,0 @@
-0xd048fd00	HMTT_pcie_init	/root/receiver_driver/pcie_driver/hmtt_pcie_driver	EXPORT_SYMBOL
-0x7acedf22	HMTT_pcie_open	/root/receiver_driver/pcie_driver/hmtt_pcie_driver	EXPORT_SYMBOL
-0xb7c68a3f	HMTT_pcie_mmap	/root/receiver_driver/pcie_driver/hmtt_pcie_driver	EXPORT_SYMBOL
-0x64c86159	HMTT_pcie_release	/root/receiver_driver/pcie_driver/hmtt_pcie_driver	EXPORT_SYMBOL
