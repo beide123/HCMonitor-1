@@ -12,6 +12,8 @@ struct mconfig* initConfig()
   conf->label_offset   = 6;
   conf->pri_offset     = 5;
   conf->pri_high_label = 1;
+  conf->server_port    = 80;
+  conf->enable_pri     = 1;
   return conf;
 }
 
@@ -31,6 +33,7 @@ int getConfig(struct mconfig *conf)
     }
 
     config_lookup_int(&cfg, "enableHTTP", &(conf->enable_http));
+    config_lookup_int(&cfg, "enableHTTPS", &(conf->enable_https));
     config_lookup_int(&cfg, "enableHY", &(conf->enable_hy));
     config_lookup_int(&cfg, "enableMCC", &(conf->enable_mcc));
     config_lookup_int(&cfg, "enablePri", &(conf->enable_pri));
@@ -50,6 +53,8 @@ int getConfig(struct mconfig *conf)
     config_lookup_int(&cfg, "PriOffset", &(conf->pri_offset));
     config_lookup_int(&cfg, "PriLabelHigh", &(conf->pri_high_label));
     config_lookup_int(&cfg, "PriLabelLow", &(conf->pri_low_label));
+    config_lookup_int(&cfg, "server_port", &(conf->server_port));
+    config_lookup_int(&cfg, "payload_len", &(conf->pkt_len));
 
     printf("Enable HTTP: %d\n", conf->enable_http);
     enable_http = conf->enable_http;

@@ -41,8 +41,8 @@
 
 /* For packet metadata enqueue */
 #define CAT_BUFF 20000000
-#define PH_BUFF 20000000
-#define PL_BUFF 1000000
+#define PH_BUFF 10000000
+#define PL_BUFF 10000000
 unsigned long thre = 0;
 unsigned long max_size = QUESIZE;
 unsigned long ph_size  = PH_BUFF;
@@ -240,38 +240,43 @@ float avg(float a[],unsigned int n)
 
 void cdf_acktime(struct atime *ack_time_pro,unsigned int idx)
 {	
-	float w[20],w_high[20],w_low[20];
-	unsigned int index, index_high,index_low,i = 0,num_low = 0,num_high = 0;
-
-    if(idx_pri_high > ph_size){
-        ack_pri_high = (float*)realloc(ack_pri_high, sizeof(float) * (idx_pri_high + 1));
-        ph_size = idx_pri_high + 1;
-    }
-
-    if(idx_pri_low > pl_size){
-        ack_pri_low = (float*)realloc(ack_pri_low, sizeof(float) * (idx_pri_low + 1));
-        pl_size = idx_pri_low + 1;
-    }
+	float w[20];
+	unsigned int index, i = 0;
 	
-	for(i = 0; i < idx; i++){
-    	if(ack_time_pro->pri[i]){
-        	ack_pri_high[num_high++] = ack_time_pro->time[i];
-		}else{
-            ack_pri_low[num_low++] = ack_time_pro->time[i];
+	float w_high[20],w_low[20];
+	unsigned int index_high,index_low,num_low = 0,num_high = 0;
+
+    if(conf->enable_pri){
+    	if(idx_pri_high > ph_size){
+        	ack_pri_high = (float*)realloc(ack_pri_high, sizeof(float) * (idx_pri_high + 1));
+        	ph_size = idx_pri_high + 1;
+    	}
+
+    	if(idx_pri_low > pl_size){
+        	ack_pri_low = (float*)realloc(ack_pri_low, sizeof(float) * (idx_pri_low + 1));
+        	pl_size = idx_pri_low + 1;
+    	}
+	
+		for(i = 0; i < idx; i++){
+    		if(ack_time_pro->pri[i]){
+        		ack_pri_high[num_high++] = ack_time_pro->time[i];
+			}else{
+            	ack_pri_low[num_low++] = ack_time_pro->time[i];
+			}
+    	}
+		
+		if(num_high){
+			qsort(ack_pri_high,num_high,sizeof(float), compInc);
+			avg_delay_high = avg(ack_pri_high,num_high);
 		}
-    }
-
-	if(num_high){
-		qsort(ack_pri_high,num_high,sizeof(float), compInc);
-		avg_delay_high = avg(ack_pri_high,num_high);
-	}
-	if(num_low){
+		if(num_low){
     		qsort(ack_pri_low,num_low,sizeof(float), compInc);
-		avg_delay_low = avg(ack_pri_low,num_low);
-	}
+			avg_delay_low = avg(ack_pri_low,num_low);
+		}
 
+   	}
 	avg_delay = avg(ack_time_pro->time, idx);
-    	qsort(ack_time_pro->time, idx, sizeof(float), compInc);
+    qsort(ack_time_pro->time, idx, sizeof(float), compInc);
 
 #ifdef OP_MYSQL
 	//open the AUTOCOMMIT
@@ -291,28 +296,31 @@ void cdf_acktime(struct atime *ack_time_pro,unsigned int idx)
 	
 	fprintf(fp, "connections:%d,retrans:%d,avg_delay:%f\n",
 			conn_active_mid,recount,avg_delay);
-	fprintf(fp, "recv_pri_high:%d, recv_pri_low:%d.\n"
-                "resp_pri_high:%d, resp_pri_low:%d.\n"
+    if(conf->enable_pri){
+		fprintf(fp, "recv_pri_high:%d, recv_pri_low:%d.\n"
                 "pri_high_num:%d,low_pri_num:%d\n",
-                recv_pri_high, recv_pri_low,
- 				idx_pri_high, idx_pri_low, 
-                num_high,num_low);
-	fprintf(fp, "CDF: %9s: %18s: %26s:\n","total","high_pri","low_pri");
-	
+            	idx_pri_high, idx_pri_low, num_high,num_low);
+		fprintf(fp, "CDF: %9s: %18s: %26s:\n","total","high_pri","low_pri");
+	}else{
+		fprintf(fp, "CDF: %9s:\n","total");
+	}
 	recount = 0;
+	
+	if(conf->enable_pri){
 
-	if(num_high && num_low){
-    	fprintf(fp, "%d: %12.4f; %16.4f; %26.4f\n", 
-			0, ack_time_pro->time[0], ack_pri_high[0], ack_pri_low[0]);
-	}else if(num_high)
-		fprintf(fp, "%d: %12.4f; %20.4f\n",
-			0, ack_time_pro->time[0], ack_pri_high[0]);
-	 else if(num_low)
-		fprintf(fp, "%d: %12.4f; %28.4f\n",
-			0, ack_time_pro->time[0], ack_pri_low[0]);
-	 else
-		fprintf(fp, "%d: %12.4f\n",
-			0, ack_time_pro->time[0]);
+		if(num_high && num_low){
+    		fprintf(fp, "%d: %12.4f; %16.4f; %26.4f\n", 
+				0, ack_time_pro->time[0], ack_pri_high[0], ack_pri_low[0]);
+		}else if(num_high)
+			fprintf(fp, "%d: %12.4f; %20.4f\n",
+				0, ack_time_pro->time[0], ack_pri_high[0]);
+	 	else if(num_low)
+			fprintf(fp, "%d: %12.4f; %28.4f\n",
+				0, ack_time_pro->time[0], ack_pri_low[0]);
+	 	else
+			fprintf(fp, "%d: %12.4f\n",
+				0, ack_time_pro->time[0]);
+	}
 
 #endif
 
@@ -322,39 +330,49 @@ void cdf_acktime(struct atime *ack_time_pro,unsigned int idx)
 	{
 		index = (int)ceil(u[i] * idx) - 1;
 		w[i] = ack_time_pro->time[index];
-		if(num_high){
-			index_high = (int)ceil(u[i] * num_high) - 1;
-			w_high[i] = ack_pri_high[index_high];
-		}
-		if(num_low){
-			index_low = (int)ceil(u[i] * num_low) - 1;
-			w_low[i] = ack_pri_low[index_low];
-		}
-		if( u[i] > 0.999){
-			printf("\n%.4f, %.4f\n", u[i], w[i]);
-			if(num_high && num_low){
-				fprintf(fp, "%.4f: %8.4f; %16.4f; %24.4f\n",
-					u[i], w[i], w_high[i], w_low[i]);
-			}else if(num_high){
-				fprintf(fp, "%.4f: %8.4f; %16.4f\n", u[i],w[i],w_high[i]);
-			}else if(num_low){
-				fprintf(fp, "%.4f: %8.4f; %24.4f\n", u[i],w[i],w_low[i]);
+		if(conf->enable_pri){
+			if(num_high){
+				index_high = (int)ceil(u[i] * num_high) - 1;
+				w_high[i] = ack_pri_high[index_high];
+			}
+			if(num_low){
+				index_low = (int)ceil(u[i] * num_low) - 1;
+				w_low[i] = ack_pri_low[index_low];
+			}
+			if( u[i] > 0.999){
+				printf("\n%.4f, %.4f\n", u[i], w[i]);
+				if(num_high && num_low){
+					fprintf(fp, "%.4f: %8.4f; %16.4f; %24.4f\n",
+						u[i], w[i], w_high[i], w_low[i]);
+				}else if(num_high){
+					fprintf(fp, "%.4f: %8.4f; %16.4f\n", u[i],w[i],w_high[i]);
+				}else if(num_low){
+					fprintf(fp, "%.4f: %8.4f; %24.4f\n", u[i],w[i],w_low[i]);
+				}else{
+					fprintf(fp, "%.4f: %8.4f\n", u[i], w[i]);
+				}
 			}else{
-				fprintf(fp, "%.4f: %8.4f\n", u[i], w[i]);
+				printf("\n%.2f, %.4f\n", u[i], w[i]);	
+				if(num_high && num_low){
+					fprintf(fp, "%.2f: %9.4f; %17.4f; %25.4f\n",
+						u[i], w[i], w_high[i], w_low[i]);
+				}else if(num_high){
+					fprintf(fp, "%.2f: %9.4f; %17.4f\n", u[i],w[i],w_high[i]);
+				}else if(num_low){
+					fprintf(fp, "%.2f: %9.4f; %25.4f\n", u[i],w[i],w_low[i]);
+				}else{
+					fprintf(fp, "%.2f: %9.4f\n", u[i], w[i]);
+				}
 			}
 		}else{
-			printf("\n%.2f, %.4f\n", u[i], w[i]);	
-			if(num_high && num_low){
-				fprintf(fp, "%.2f: %9.4f; %17.4f; %25.4f\n",
-					u[i], w[i], w_high[i], w_low[i]);
-			}else if(num_high){
-				fprintf(fp, "%.2f: %9.4f; %17.4f\n", u[i],w[i],w_high[i]);
-			}else if(num_low){
-				fprintf(fp, "%.2f: %9.4f; %25.4f\n", u[i],w[i],w_low[i]);
+			if( u[i] > 0.999){
+				fprintf(fp, "%.4f: %8.4f\n", u[i], w[i]);
 			}else{
 				fprintf(fp, "%.2f: %9.4f\n", u[i], w[i]);
 			}
+				
 		}
+
 #ifdef OP_MYSQL 
 		if(insert_mysql_hy(w[i],u[i],i))
 		    printf("Error when update row =%d\n",i);
@@ -417,7 +435,7 @@ void lcore_online(void)
 		if(lock_flag && idx_hy){
 			//printf("idx_hy:%ld\n",idx_hy);
 			memcpy(ack_time_hy->time,ack_time->time,sizeof(float) * idx_hy);
-			memcpy(ack_time_hy->pri,ack_time->pri,sizeof(int) * idx_hy);
+			memcpy(ack_time_hy->pri,ack_time->pri,sizeof(float) * idx_hy);
 			idx = idx_hy;
 			idx_hy = 0;
 			cdf_acktime(ack_time_hy,idx);
@@ -728,47 +746,49 @@ int key_extract(struct rte_ipv4_hdr *ip_hdr,struct node_data *data,struct timesp
     }
 }
 
-int packet_process(struct rte_ipv4_hdr *ip_hdr, struct timespec ts_now, int lcore_id)
-{	
+int packet_process(struct rte_ipv4_hdr *ip_hdr, struct timespec ts_now, int lcore_id, uint16_t payload_len)
+{
     int la_key;
-    if(likely((PrQue[lcore_id]->occupy + 1) % max_size != PrQue[lcore_id]->deque)){
-    QType *q = PrQue[lcore_id]->RxQue + PrQue[lcore_id]->occupy;
+	if(likely((PrQue[lcore_id]->occupy + 1) % max_size != PrQue[lcore_id]->deque)){
+        QType *q = PrQue[lcore_id]->RxQue + PrQue[lcore_id]->occupy;
 #if USE_HTTP
-    la_key = http_parse(ip_hdr, q, ts_now);
+        if(conf->enable_https){
+        	la_key = https_parse(ip_hdr, q, ts_now, payload_len);
+        }else
+            la_key = http_parse(ip_hdr, q, ts_now);
+        }
+#else
+    	    la_key = key_extract(ip_hdr, q, ts_now); 
 #endif
-    if(conf->enable_mcc)
-       la_key = burst_count(ip_hdr, q, ts_now);
-    else
-       la_key = key_extract(ip_hdr, q, ts_now); 
-       if(likely(la_key > 0))
-	{       
-    	    PrQue[lcore_id]->occupy = (PrQue[lcore_id]->occupy + 1) % max_size;
-    	    _mm_sfence();
-    	return 1;			
+	    if(likely(la_key > 0))
+    	{       
+		    PrQue[lcore_id]->occupy = (PrQue[lcore_id]->occupy + 1) % max_size;
+		    _mm_sfence();
+        	return 1;			
+    	}else{
+    	    //printf("Enqueue failed\n");
+            return la_key;		
+	    }		
 	}else{
-	    //printf("Enqueue failed\n");
-        return la_key;		
-        }		
-    }else{
     	PrQue[lcore_id]->RxQue = (QType*)realloc(PrQue[lcore_id]->RxQue,
                                 (2 * max_size) * sizeof(struct node_data));
-    max_size = 2 * max_size;
-    QType *q = PrQue[lcore_id]->RxQue + PrQue[lcore_id]->occupy;
+    	max_size = 2 * max_size;
+    	QType *q = PrQue[lcore_id]->RxQue + PrQue[lcore_id]->occupy;
 #if USE_HTTP
         la_key = http_parse(ip_hdr, q, ts_now);
 #endif
-    if(conf->enable_mcc)
-        la_key = burst_count(ip_hdr, q, ts_now);
-    else
-    	la_key = key_extract(ip_hdr, q ,ts_now); 
+    	if(conf->enable_mcc)
+        	la_key = burst_count(ip_hdr, q, ts_now);
+    	else
+    		la_key = key_extract(ip_hdr, q ,ts_now); 
     	if(likely(la_key) > 0)
-	{       
+		{       
     		PrQue[lcore_id]->occupy = (PrQue[lcore_id]->occupy + 1) % max_size;
     		_mm_sfence();
     	return 1;		
-	}else{		
+		}else{		
     		//printf("Enqueue failed\n");
-        return la_key;
+        	return la_key;
     	}	
     }
 		

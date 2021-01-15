@@ -29,8 +29,12 @@ enum packet_type
 struct mconfig
 {
     int  enable_http;    //network type IOT/normal HTTP. 1: HTTP, else IOT
-    int  enable_hy;      //server platform. 1:Hy,else x86
-    int  enable_mcc;
+    int  enable_https;   //test https traffic
+    int  enable_hy;      //IOT traffic server platform. 1:Hy,else x86
+	int  enable_mcc;
+
+    int  server_port;    //server node port, used for judge https packet direction
+    int  pkt_len;        //payload length, used for judge https packet priority
 
     /*parse request/response packet in IOT network*/
     int req_label[MAXLABEL];  //labels for request judge

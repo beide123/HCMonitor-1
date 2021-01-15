@@ -180,7 +180,7 @@ static const struct rte_eth_conf port_conf = {
         .rss_conf = {
             .rss_key = NULL,
             .rss_hf = ETH_RSS_E1000_IGB,
-			//ETH_RSS_I40E,
+            //.rss_hf = ETH_RSS_I40E,
         },
     },
     .txmode = {
@@ -423,12 +423,12 @@ l2fwd_simple_forward(struct rte_mbuf *m, unsigned portid, struct timespec ts_now
             ret = fwrite(&ph, sizeof(pcap_header), 1, fp_out);
             ret = fwrite(buff, 1, ph.capture_len, fp_out);
 #else
-	    if (likely((uint8_t)ip_hdr->next_proto_id == 6 && 
-			total_len > sizeof(struct rte_ipv4_hdr) + ((tcp->data_off & 0xf0) >> 2)))
+		uint16_t payload_len = total_len - sizeof(struct rte_ipv4_hdr)
+ 										 - ((tcp->data_off & 0xf0) >> 2);
+	    if (likely((uint8_t)ip_hdr->next_proto_id == 6 && payload_len > 0))
 	    {
 			port_statistics[portid].tcp_psh++;
-
-    		if(!(packet_process(ip_hdr, ts_now, lcore_id)))
+    		if(!(packet_process(ip_hdr, ts_now, lcore_id, payload_len)))
 				err++;
     			//printf("packet process failed!\n");
 		}

@@ -146,6 +146,72 @@ uint8_t http_parse(struct rte_ipv4_hdr *ip_hdr,struct node_data *data,struct tim
 	}
 	
 }
+
+uint8_t https_parse(struct rte_ipv4_hdr *ip_hdr,struct node_data *data,struct timespec ts_now, uint16_t payload_len)
+{
+    struct rte_tcp_hdr  *tcp;
+
+    uint16_t src_port,dst_port;
+
+    tcp = (struct rte_tcp_hdr *)((unsigned char *) ip_hdr + sizeof(struct rte_ipv4_hdr));
+
+    dst_port = rte_be_to_cpu_16(tcp->dst_port);
+    src_port = rte_be_to_cpu_16(tcp->src_port);
+
+    if(!data){
+        printf("node_data has been NULL!");
+        return 0;
+    }
+
+    if (dst_port == conf->server_port)
+    {
+
+        data->key.ip_src = rte_be_to_cpu_32(ip_hdr->src_addr);
+
+        data->key.port_src = src_port;
+
+        data->type = M_REQ;//req_bit[POFFSET];
+
+		if(payload_len > conf->pkt_len) {
+			data->pri = conf->pri_high_label;
+		} else {
+			data->pri = 0;
+		}
+
+        data->total_len = rte_be_to_cpu_16(ip_hdr->total_length);
+
+        data->sent_seq = rte_be_to_cpu_32(tcp->sent_seq);
+
+        data->ack_seq = rte_be_to_cpu_32(tcp->recv_ack);
+
+        data->ts.tv_sec = ts_now.tv_sec;
+
+        data->ts.tv_nsec = ts_now.tv_nsec;
+
+        return 1;
+    }else if(src_port == conf->server_port)
+    {
+        data->key.ip_src = rte_be_to_cpu_32(ip_hdr->dst_addr);
+            
+        data->key.port_src = dst_port;
+        
+        data->type = M_RSP;
+
+        data->total_len = rte_be_to_cpu_16(ip_hdr->total_length);
+        
+        data->key.status = data->status;
+
+        data->sent_seq = rte_be_to_cpu_32(tcp->recv_ack);
+
+        data->ts.tv_sec = ts_now.tv_sec;
+
+        data->ts.tv_nsec = ts_now.tv_nsec;
+
+        return 1;
+        
+    }else
+        return 0;
+}
 #endif
 
 
