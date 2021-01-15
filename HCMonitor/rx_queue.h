@@ -4,7 +4,7 @@
 #include <sys/time.h>
 
 #define BUFSIZE 20000000
-#define MAX_QUE_NUM 2
+#define MAX_QUE_NUM 8
 #define QUESIZE (BUFSIZE / MAX_QUE_NUM)
 
 struct ipv4_2tuple {
