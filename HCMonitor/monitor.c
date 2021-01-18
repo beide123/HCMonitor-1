@@ -296,7 +296,6 @@ void cdf_acktime(struct atime *ack_time_pro,unsigned int idx)
 	
 	fprintf(fp, "connections:%d,retrans:%d,avg_delay:%f\n",
 			conn_active_mid,recount,avg_delay);
-<<<<<<< HEAD
     if(conf->enable_pri){
 		fprintf(fp, "recv_pri_high:%d, recv_pri_low:%d.\n"
                 "pri_high_num:%d,low_pri_num:%d\n",
@@ -305,16 +304,6 @@ void cdf_acktime(struct atime *ack_time_pro,unsigned int idx)
 	}else{
 		fprintf(fp, "CDF: %9s:\n","total");
 	}
-=======
-	fprintf(fp, "recv_pri_high:%d, recv_pri_low:%d.\n"
-                "resp_pri_high:%d, resp_pri_low:%d.\n"
-                "pri_high_num:%d,low_pri_num:%d\n",
-                recv_pri_high, recv_pri_low,
- 				idx_pri_high, idx_pri_low, 
-                num_high,num_low);
-	fprintf(fp, "CDF: %9s: %18s: %26s:\n","total","high_pri","low_pri");
-	
->>>>>>> 9d50010f69df23789aeefb80bf7c7a894b5de7ae
 	recount = 0;
 	
 	if(conf->enable_pri){
@@ -538,10 +527,6 @@ int response_time_process(struct node_data *data,uint16_t nb_rx,uint16_t socket_
 							data->total_len);
 							fclose(fp_re);
 #endif
-<<<<<<< HEAD
-=======
-			recount++;
->>>>>>> 9d50010f69df23789aeefb80bf7c7a894b5de7ae
 			
 			return -2;
         } 
