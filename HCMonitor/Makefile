@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright(c) 2010-2014 Intel Corporation
-RTE_SDK=/home/songhui/HCMonitor-master/downloads/dpdk-stable-19.11.4
+RTE_SDK=/home/songhui/dpdk-stable-19.08.2
+RTE_TARGET=x86_64-native-linuxapp-gcc
 # binary name
 APP = monitor
 
