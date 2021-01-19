@@ -106,8 +106,13 @@ char rlog[20] = "response.txt";
  */
 struct rte_ring *output_ring[RTE_MAX_ETHPORTS];
 
+struct tik_mbuf{
+	struct rte_mbuf *m;
+	struct timespec now;
+};
+
 struct ssd_queue{
-	struct rte_mbuf **ring;
+	struct tik_mbuf **ring;
 	volatile unsigned long occupy;
     volatile unsigned long deque;	
 };
@@ -460,7 +465,8 @@ static void
 l2fwd_main_loop(void)
 {
 	struct rte_mbuf *pkts_burst[MAX_PKT_BURST];
-	struct rte_mbuf *m, *ssd;
+	struct rte_mbuf *m; 
+	struct tik_mbuf *ssd;
 	unsigned lcore_id;
 	uint64_t prev_tsc, diff_tsc, cur_tsc, timer_tsc;
 	uint64_t prev_sta,diff_sta,cur_sta,timer_sta;
@@ -483,11 +489,9 @@ l2fwd_main_loop(void)
 	    int ret;
 	    while(1){
         	for(i = 0; i < MAX_QUE_NUM; i++){
-			ts_now.tv_sec = ts.tv_sec;
-			ts_now.tv_nsec = ts.tv_nsec;
 			if(SSD_Ring[i]->occupy != SSD_Ring[i]->deque){
-				struct rte_mbuf *m = SSD_Ring[i]->ring[SSD_Ring[i]->deque];
-				ret = trans_pcap(m, ts_now, i);
+				struct tik_mbuf *tm = SSD_Ring[i]->ring[SSD_Ring[i]->deque];
+				ret = trans_pcap(tm->m, tm->now, i);
                 		SSD_Ring[i]->deque = (SSD_Ring[i]->deque + 1) % SSD_NUM;
             		}
 
@@ -653,7 +657,9 @@ l2fwd_main_loop(void)
 #ifdef PMD_MODE
 				if(likely((SSD_Ring[lcore_id]->occupy + 1) % SSD_NUM != SSD_Ring[lcore_id]->deque)){
 					ssd = SSD_Ring[lcore_id]->ring[SSD_Ring[lcore_id]->occupy];
-					memcpy(ssd, m, sizeof(struct rte_mbuf));
+					memcpy(ssd->m, m, sizeof(struct rte_mbuf));
+					ssd->now.tv_sec = ts.tv_sec;
+					ssd->now.tv_nsec = ts.tv_nsec;
 					SSD_Ring[lcore_id]->occupy = (SSD_Ring[lcore_id]->occupy + 1) % SSD_NUM;
 					_mm_sfence();
 				}else{
@@ -1076,13 +1082,14 @@ main(int argc, char **argv)
     for(i = 0; i < 1; i++){
         SSD_Ring[i] = (ssd_t)calloc(1, sizeof(struct ssd_queue));
         SSD_Ring[i]->deque = SSD_Ring[i]->occupy = 0;
-        SSD_Ring[i]->ring = (struct rte_mbuf**)calloc(SSD_NUM, sizeof(struct rte_mbuf*));
+        SSD_Ring[i]->ring = (struct tik_mbuf**)calloc(SSD_NUM, sizeof(struct tik_mbuf*));
         PP_Ring[i] = (pp_que_t)calloc(1, sizeof(struct pcap_queue));
         PP_Ring[i]->deque = PP_Ring[i]->occupy = 0;
         PP_Ring[i]->ring = (pcap_t*)calloc(SSD_NUM, sizeof(pcap_t));
 		for(j = 0; j < SSD_NUM; j++){
         	PP_Ring[i]->ring[j] = (pcap_t*)calloc(1, sizeof(struct to_pcap));
-        	SSD_Ring[i]->ring[j] = (struct rte_mbuf*)calloc(1, sizeof(struct rte_mbuf));
+        	SSD_Ring[i]->ring[j] = (struct tik_mbuf*)calloc(1, sizeof(struct tik_mbuf));
+        	SSD_Ring[i]->ring[j]->m = (struct rte_mbuf*)calloc(1, sizeof(struct rte_mbuf));
         	//PP_Ring[i]->ring[j]->buff = (char*)calloc(1, sizeof(char));
 		}
     }
