@@ -27,7 +27,8 @@ int getConfig(struct mconfig *conf)
 
     config_init(&cfg);
     if (! config_read_file(&cfg, cfg_file)) {
-        perror("config_read_file");
+		fprintf(stderr, "Error: %s:%d - %s\n", config_error_file(&cfg),
+		                config_error_line(&cfg), config_error_text(&cfg));
         config_destroy(&cfg);
         return -1;
     }
