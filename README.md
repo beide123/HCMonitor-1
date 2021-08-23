@@ -1,5 +1,5 @@
 
-# HCMonitor (High Concurrent Monitor)
+# HCMonitor (High Concurrent Monitor, this project has been moved)
 
 ### Introduction
 
