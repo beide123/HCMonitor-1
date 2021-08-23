@@ -1,6 +1,5 @@
 
-# HCMonitor (High Concurrent Monitor)
-
+# HCMonitor (High Concurrent Monitor, The project has been moved to https://toscode.gitee.com/acs-dcn/HCMonitor for maintenance and update.)
 ### Introduction
 
 HCMonitor is a monitor system for high concurrent network services, which is developed on user-level and estimates response latency from requests input to responses output, called server-side latency. 
